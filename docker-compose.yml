@@ -1,0 +1,56 @@
+version: '3.4'
+
+services:
+  php:
+    build:
+      context: ./docker/php
+    expose:
+      - "6001"
+    networks:
+      - pgnet
+    volumes:
+      - ./app:/var/www/html
+
+  nginx:
+    image: nginx:latest
+    networks:
+      - pgnet
+    ports:
+      - 8081:80
+    volumes:
+      - ./app:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+
+  postgres:
+    container_name: "pgmaster"
+    image: postgres:13.3
+    networks:
+      - pgnet
+    environment:
+      POSTGRES_DB: admin
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - 5435:5432
+    volumes:
+      - ./volumes/pgmaster/:/var/lib/postgresql/data
+      - my-vol:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: "rabbitmq-server"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    ports:
+      - 5672:5672
+      - 5671:5671
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq
+    networks:
+      - pgnet
+
+volumes:
+  my-vol:
+networks:
+  pgnet:

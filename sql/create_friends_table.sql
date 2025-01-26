@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS friends (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    friend_id BIGINT NOT NULL
+);
+
+
+

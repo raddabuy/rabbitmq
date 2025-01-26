@@ -1,0 +1,5 @@
+/app/.env
+/app/vendor
+.idea
+/volumes
+/rabbitmq
