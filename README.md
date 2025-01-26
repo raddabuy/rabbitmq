@@ -1,27 +1,31 @@
-В результате выполнения ДЗ создан базовый скелет социальной сети, который будет развиваться в дальнейших ДЗ.
+В результате выполнения ДЗ разработано онлайн обновление ленты новостей. 
 Проект выполнен на читом php без использовани фреймворков, использована БД postgres.
 
 Инструкция дляразвертывания проекта:
 1. В корне проекта выполнить команду docker compose build (или docker-compose в зависимости от установленной версии сompose).
 2. Запустить контейнеры docker compose up -d
-3. Выполнить sql файл. Для этого нужно:
-     3.1. docker compose cp ./sql/create_users_table.sql postgres:/docker-entrypoint-initdb.d/create_users_table.sql (копируем файл в контейнер)
-     3.2. docker compose exec -u root postgres psql admin root -f docker-entrypoint-initdb.d/create_users_table.sql (выполняем sql команду)
-   В итоге создается таблица users
+3. Выполнить sql файлы, находящиеся в папке /sql. Для этого нужно:
+     3.1.  скопировать нужный файл в контейнер командой docker compose cp ./sql/create_users_table.sql postgres:/docker-entrypoint-initdb.d/create_users_table.sql 
+     3.2. выполнить его командой docker compose exec -u root postgres psql admin root -f docker-entrypoint-initdb.d/create_users_table.sql 
+   В рамках данной задачи нужны таблицы users, posts, friends, feeds (материализованные лентыпользователей)  
 5. Установить необходимые пакеты. Для этого нужно:
     4.1. Зайти в php контейнер командой docker compose exec php bash
-    4.2. В bash выполнить сcomposer install
+    4.2. В bash выполнить composer install
 
 Всё, проект готов к работе.
-К домашнему заданию приложена коллекция из Postman. В ней содержится 3 запроса:
-/login
-/user/register
-/user/get/{id}
 
-UPDATE 29.11.2024
-Добавлен запрос для поиска из спецификации /user/search. К домашнему заданию будет приложена обновленная коллекция из Postman
-Добавлен файл для импорта пользователей и отредактирован файл create_users_table.sql. Чтобы импортировать данные, требуется выполнить следующие действия:
-1. docker compose cp ./sql/create_users_table.sql postgres:/docker-entrypoint-initdb.d/create_users_table.sql (копируем измененный файл в контейнер)
-2. docker compose cp ./sql/people.v2.csv postgres:/docker-entrypoint-initdb.d/people.v2.csv (копируем файл с данными)
-3. docker compose exec -u root postgres psql admin root -f docker-entrypoint-initdb.d/create_users_table.sql (выполняем sql команду)
-
+Логика работы выстроена следующим образом:
+Пользователь создает пост при помощи синхронного POST запроса /api/post/create из спецификации. После сохранения поста в БД в таблицу posts для всех его друзей отправляется сообщение с помощью RabbitMQ, что нужно обновить ленты определенных пользователей. Сообщение содержит json строку, в которой есть информация о созданном посте. Id нужных пользователей определяется при помощи routingKey.
+Consumer, который имеет в себе логику для обновления лент пользователей, является простым скриптом, можно запустить в контейнере приложения (docker compose exec php bash) при помощи команды
+php Consumer.php. После обновления ленты обработчик отправляет на Websocket эндпоинт событие о том, что лента определенного пользователя была обновлена. Чтобы это проихошло, до вызова асинхронного эндпоинта в соседней консоли нужно запустить Websocket сервер аналогичным образом: в контейнере приложения вызвать php WebsocketServer.php.
+Работа вебсокетов организована при помощи асинхронного фреймворка Workerman для php. Данный проект содержит только бэкенд часть. Чтобы пользователь в браузере получил сообщение об обновлении ленты, необходимо во фронтовую часть добавить обработчик данного события 
+                                   <!DOCTYPE html>
+                                   <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+                                   <head>
+                                       <script>
+                                           ws = new WebSocket("ws://127.0.0.1:8000/?user=id&token=token");
+                                           ws.onmessage = function(evt) {alert(evt.data);};
+                                       </script>
+                                   </head>
+                                   </html>
+Токен авторизации проверяется обработчиком. Если он валидный и соответсвует userId, то отправляем сообщение, в котором содержится информация о новом посте в его ленте.
